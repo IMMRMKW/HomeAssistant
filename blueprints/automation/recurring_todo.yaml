@@ -1,0 +1,110 @@
+blueprint:
+  name: Recurring to-do
+  description: Turn calendar events into (recurring) to-do items
+  domain: automation
+  input:
+    calendar:
+      name: Calendar
+      description: The calendar entity to monitor for events
+      selector:
+        entity:
+          domain: calendar
+    todolist:
+      name: To-do List
+      description: The to-do list entity to add items to
+      selector:
+        entity:
+          domain: todo
+    default_due_date:
+      name: Default Due Date (days from now)
+      description: Number of days from now for the default due date if no event is found
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 365
+          step: 1
+          mode: box
+    phones:
+      name: Phones to notify
+      description: Devices that receive the notification.
+      default: []
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: mobile_app
+    notification_message:
+      name: Notification Message
+      description: The message to send in the notification.
+      default: "Is added to your chores list."
+      selector:
+        text:
+    icon:
+      name: Notification Icon
+      description: Select an MDI icon for the notification.
+      selector:
+        icon:
+          placeholder: mdi:format-list-bulleted
+
+triggers:
+  - id: "calender_event"
+    trigger: calendar
+    entity_id: !input calendar
+    event: start
+
+variables:
+  default_due_date: !input default_due_date
+  input_calendar: !input calendar
+  input_phones: !input phones
+  phone_names: "{{ input_phones | map('device_attr', 'name') | list }}"
+  notify_services: >
+    {% set result = namespace(r=[]) %}
+    {% for name in phone_names %}
+      {% set result.r = result.r + ['notify.mobile_app_' + name | slugify] %}
+    {% endfor %}
+    {{ result.r }}
+
+condition: []
+
+action:
+  - action: calendar.get_events
+    target:
+      entity_id: !input calendar
+    response_variable: calendar_events
+    data:
+      start_date_time: '{{ now() + timedelta(days=1) }}'
+      end_date_time: '{{ now() + timedelta(days=default_due_date | int)}}'
+  - action: todo.add_item
+    target:
+      entity_id: !input todolist
+    data:
+      item: >
+        {% if trigger is defined and trigger.calendar_event is defined and trigger.calendar_event is mapping and trigger.calendar_event.summary is not none %}
+          {{ trigger.calendar_event.summary }}
+        {% else %}
+          unknown item
+        {% endif %}
+      due_date: >
+        {% set item_name = (trigger.calendar_event.summary if trigger is defined and trigger.calendar_event is defined and trigger.calendar_event is mapping and trigger.calendar_event.summary is not none else 'unknown item') %}
+         {% set events = calendar_events[input_calendar]['events'] if calendar_events else [] %}
+        {% set matching_events = events | selectattr('summary', 'search', item_name) | list %}
+        {% set matching_event = matching_events[0] if matching_events|length > 0 else none %}
+        {% set event_start = matching_event['start'] if matching_event is not none and matching_event['start'] is defined else (now() + timedelta(days=(default_due_date | int))).isoformat() %}
+        {% set date_only = event_start.split('T')[0] %}
+        {{ date_only }}
+      description: >
+        {{ trigger.calendar_event.description if trigger is defined and trigger.calendar_event is defined and trigger.calendar_event.description is defined else '' }}
+  - repeat:
+      count: "{{ notify_services | count }}"
+      sequence:
+        - variables:
+            notify_service: "{{ notify_services[repeat.index-1] }}"
+        - service: "{{ notify_service }}"
+          data:
+            title: >
+              {{ trigger.calendar_event.summary if trigger is defined and trigger.calendar_event is defined and trigger.calendar_event.summary is not none else 'unknown item' }}
+            message: !input notification_message
+            data:
+              notification_icon: !input icon
+mode: parallel

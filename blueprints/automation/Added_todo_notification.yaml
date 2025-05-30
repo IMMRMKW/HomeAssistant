@@ -1,0 +1,107 @@
+blueprint:
+  name: Notify on To-Do Item Added
+  description: Sends a notification when a to-do item is added to a list.
+  domain: automation
+  input:
+    phones:
+      name: Phones to notify
+      description: Devices that receive the notification.
+      default: []
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: mobile_app
+    notification_title:
+      name: Notification Title
+      description: Title for the notification.
+      default: "To Do item Added"
+      selector:
+        text:
+    notification_message:
+      name: Notification Message
+      description: Message for the notification. Use {{item}}, {{list_name}}, and {{user_name}} as variables.
+      default: "{{item}} was just added to the {{list_name}} ToDo list by {{user_name}}."
+      selector:
+        text:
+    todolist_name:
+      name: To-Do List Name
+      description: The name of the to-do list to match.
+      selector:
+        entity:
+          domain: todo
+    icon:
+      name: Notification Icon
+      description: Select an MDI icon for the notification.
+      selector:
+        icon:
+          placeholder: mdi:format-list-bulleted
+    notify_on_system:
+      name: Notify on System Additions
+      description: Send notifications if the to-do item was added by the system (not a user)?
+      default: false
+      selector:
+        boolean:
+
+triggers:
+  - trigger: event
+    event_type: call_service
+    event_data:
+      domain: todo
+      service: add_item
+    variables:
+      list_name: >-
+        {% set eid = trigger.event.data.service_data.entity_id %}
+        {% if eid is string %}
+          {{ state_attr(eid, 'friendly_name') }}
+        {% elif eid is iterable and eid|length > 0 %}
+          {{ state_attr(eid[0], 'friendly_name') }}
+        {% else %}
+          unknown
+        {% endif %}
+      item: "{{ trigger.event.data.service_data.item | title }}"
+      user_name: >
+        {% set uid = trigger.event.context.user_id %}
+        {% set matching_users = states.person | selectattr('attributes.user_id', '==', uid) | list %}
+        {% set user = matching_users | first if matching_users | length > 0 else "System" %}
+        {{ user if user == "System" else state_attr(user.entity_id,"friendly_name") }}
+variables:
+  input_phones: !input phones
+  phone_names: "{{ input_phones | map('device_attr', 'name') | list }}"
+  notify_services: >
+    {% set result = namespace(r=[]) %}
+    {% for name in phone_names %}
+      {% set result.r = result.r + ['notify.mobile_app_' + name | slugify] %}
+    {% endfor %}
+    {{ result.r }}
+  input_todo_list_name: !input todolist_name
+  input_todolist_friendly_name: >-
+    {% set eid = input_todo_list_name %}
+    {% if eid is string %}
+      {{ state_attr(eid, 'friendly_name') }}
+    {% elif eid is iterable and eid|length > 0 %}
+      {{ state_attr(eid[0], 'friendly_name') }}
+    {% else %}
+      unknown
+    {% endif %}
+  notify_on_system: !input notify_on_system
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ list_name == input_todolist_friendly_name and (notify_on_system or user_name != 'System') }}
+
+action:
+  - repeat:
+      count: "{{ notify_services | count }}"
+      sequence:
+        - variables:
+            notify_service: "{{ notify_services[repeat.index-1] }}"
+        - service: "{{ notify_service }}"
+          data:
+            title: !input notification_title
+            message: !input notification_message
+            data:
+              notification_icon: !input icon
+
+mode: parallel
