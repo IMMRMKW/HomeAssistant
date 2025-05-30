@@ -12,3 +12,7 @@ This repository contains blueprints for Home Assistant automation.
   By leveraging recurring calendar events, you can easily create recurring to-do items.
 
 ---
+
+## Support & More
+If you like this, maybe also visit [my other projects](https://github.com/IMMRMKW). If you'd like to support my work, you can buy me a coffee!
+<a href="https://www.buymeacoffee.com/immrmkw" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
