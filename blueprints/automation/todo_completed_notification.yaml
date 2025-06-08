@@ -1,0 +1,98 @@
+blueprint:
+  name: Notify when To-Do Item Completed
+  description: Sends a notification to selected phones when an item of a to-do list is completed.
+  domain: automation
+  input:
+    todolist:
+      name: To-Do List
+      description: The to-do list entity to monitor for completed items.
+      selector:
+        entity:
+          domain: todo
+    phones:
+      name: Phones to notify
+      description: Devices that receive the notification.
+      default: []
+      selector:
+        device:
+          multiple: true
+          filter:
+            integration: mobile_app
+    notification_title:
+      name: Notification Title
+      description: Title for the notification.
+      default: "To-Do Completed"
+      selector:
+        text:
+    notification_message:
+      name: Notification Message
+      description: Message for the notification. You can use {{ user_name }} and {{ completed }} as variables.
+      default: "{{ completed }} was completed by {{ user_name }}."
+      selector:
+        text:
+    icon:
+      name: Notification Icon
+      description: Select an MDI icon for the notification.
+      selector:
+        icon:
+          placeholder: mdi:check
+variables:
+  input_phones: !input phones
+  phone_names: "{{ input_phones | map('device_attr', 'name') | list }}"
+  notify_services: >
+    {% set result = namespace(r=[]) %}
+    {% for name in phone_names %}
+      {% set result.r = result.r + ['notify.mobile_app_' + name | slugify] %}
+    {% endfor %}
+    {{ result.r }}
+  todo_entity: !input todolist
+
+triggers:
+  - trigger: state
+    entity_id: !input todolist
+    variables:
+      user_name: >
+        {% set uid = trigger.to_state.context.user_id %}
+        {% set matching_users = states.person | selectattr('attributes.user_id', '==', uid) | list %}
+        {% if matching_users | length > 0 %}
+          {{ matching_users[0].attributes.friendly_name }}
+        {% else %}
+          System
+        {% endif %}
+      
+condition:
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.state | int < trigger.from_state.state | int }}
+  - condition: template
+    value_template: >
+      {{ user_name | lower != 'system' }}
+
+action:
+  - service: todo.get_items
+    target:
+      entity_id: !input todolist
+    response_variable: todo_items
+    data:
+      status: 'completed'
+  - variables:
+      completed: >
+        {% set items = todo_items[todo_entity]['items'] if todo_items is defined and todo_entity in todo_items and 'items' in todo_items[todo_entity] else [] %}
+        {% if items | length > 0 and items[0] is mapping and 'summary' in items[0] %}
+          {{ items[-1].summary }}
+        {% else %}
+          Unknown item
+        {% endif %}
+  - repeat:
+      count: "{{ notify_services | count }}"
+      sequence:
+        - variables:
+            notify_service: "{{ notify_services[repeat.index-1] }}"
+        - service: "{{ notify_service }}"
+          data:
+            title: !input notification_title
+            message: !input notification_message
+            data:
+              notification_icon: !input icon
+
+mode: parallel

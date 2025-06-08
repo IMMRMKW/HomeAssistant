@@ -11,6 +11,9 @@ This repository contains blueprints for Home Assistant automation.
   Adds calendar events to your to-do list and notifies specific users when this happens.  
   By leveraging recurring calendar events, you can easily create recurring to-do items.
 
+- *todo_completed_notification.yaml*:
+  Sends a notification whenever an item in a to-do list is completed. The notification can include the completed item's name and the user who completed it.
+
 ---
 
 ## Support & More
