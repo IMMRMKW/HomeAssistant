@@ -1,0 +1,20 @@
+type: custom:button-card
+name: Vacuum Living Room
+icon: mdi:play
+color_type: card
+color: rgb(0,100,0)
+aspect_ratio: 3/1.5
+tap_action:
+  action: call-service
+  service: vacuum.send_command
+  service_data:
+    entity_id: vacuum.consuela
+    command: start
+    params:
+      pmap_id: 69_uii6sQ_qHrccv_FINAg
+      regions:
+        - region_id: '1'    # region_id as string
+          type: rid
+        - region_id: '2'    # region_id as string
+          type: rid
+      user_pmapv_id: 250326T071933
