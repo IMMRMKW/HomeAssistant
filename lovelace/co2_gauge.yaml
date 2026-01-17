@@ -1,0 +1,20 @@
+type: gauge
+entity: sensor.esphome_web_79a218_scd4x_co2
+name: CO2
+unit: ppm
+needle: true
+min: 0
+max: 5500
+segments:
+  - from: 0
+    color: "#009600"
+  - from: 650
+    color: "#8CC600"
+  - from: 1500
+    color: "#FFEF00"
+  - from: 2000
+    color: "#FFB200"
+  - from: 2500
+    color: "#F79600"
+  - from: 5000
+    color: "#FF0000"

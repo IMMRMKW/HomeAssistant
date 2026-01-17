@@ -1,0 +1,19 @@
+type: gauge
+entity: sensor.esphome_web_79a218_pm_2_5_m
+needle: true
+min: 0
+max: 300
+segments:
+  - from: 0
+    color: "#009600"
+  - from: 12
+    color: "#8CC600"
+  - from: 35
+    color: "#FFEF00"
+  - from: 55
+    color: "#FFB200"
+  - from: 150
+    color: "#F79600"
+  - from: 250
+    color: "#FF0000"
+name: PM < 2.5  µm
